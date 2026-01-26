@@ -47,8 +47,9 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./ && npm run copy-python",
+    "compile": "tsc -p ./ && npm run copy-python && npm run copy-assets",
     "copy-python": "cp src/extractors/python_ast_helper.py out/extractors/python_ast_helper.py || true",
+    "copy-assets": "cp src/ui/*.html out/ui/ || true",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
@@ -60,6 +61,7 @@
     "@babel/parser": "^7.23.0",
     "@babel/traverse": "^7.23.0",
     "@babel/types": "^7.23.0",
-    "@google/generative-ai": "^0.2.0"
+    "@google/genai": "^1.38.0",
+    "dotenv": "^17.2.3"
   }
 }

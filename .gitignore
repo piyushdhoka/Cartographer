@@ -1,9 +1,37 @@
+# Dependencies
 node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+.nyc_output/
+
+# Production
 out/
 dist/
-*.vsix
-.vscode-test/
-*.log
+build/
+
+# Misc
 .DS_Store
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+thumbs.db
+
+# VS Code Extension
+.vscode-test/
+*.vsix
 *.key
+
+# Editor Config
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json

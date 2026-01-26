@@ -47,15 +47,16 @@ To enable Gemini AI explanations:
 
 ## Architecture
 
-- **Workspace Scanner**: Scans files and folders
-- **Archaeologist Agent**: Extracts metadata (files, languages, entry points)
-- **Detective Agent**: Extracts import dependencies
-- **Function Extractors**: Extract functions from Python (AST) and JS/TS (Babel)
-- **Knowledge Graph**: Central graph data structure
-- **Graph Queries**: Blast radius, centrality, file importance
-- **Query Planner**: Maps questions to query intents (deterministic)
-- **Orchestrator**: Executes queries and returns structured results
-- **Gemini Client**: Optional LLM explanations
+- **Coordinator**: Orchestrates the multi-agent system.
+- **Archaeologist Agent**: Maps the repository structure and languages.
+- **Detective Agent**: Resolves dependencies and imports.
+- **Risk Assessor**: Scans for security risks and technical debt.
+- **Historian Agent**: Analyzes Git history for hotspots.
+- **Translator Agent**: Auto-documents complex code (requires Gemini).
+- **Architect Agent**: Detects circular dependencies and structural issues.
+- **Knowledge Base**: Shared memory for agent findings.
+- **Knowledge Graph**: Central graph data structure for queries.
+
 
 ## Development
 

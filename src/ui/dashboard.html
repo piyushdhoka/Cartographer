@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' var(--vscode-font-family); script-src 'unsafe-inline';">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Project Cartographer</title>
+    <script>
+        window.onerror = function(message, source, lineno, colno, error) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.color = 'red';
+            errorDiv.style.padding = '10px';
+            errorDiv.style.border = '1px solid red';
+            errorDiv.style.margin = '10px';
+            errorDiv.style.backgroundColor = '#2d0000';
+            errorDiv.textContent = 'JS Error: ' + message + ' at line ' + lineno + ':' + colno;
+            document.body.prepend(errorDiv);
+        };
+    </script>
+    <style>
+        body {
+            font-family: var(--vscode-font-family);
+            padding: 20px;
+            color: var(--vscode-foreground);
+            background-color: var(--vscode-editor-background);
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: var(--vscode-textLink-foreground);
+            margin-bottom: 20px;
+        }
+        .input-section {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        select, input, button {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            background-color: var(--vscode-input-background);
+            color: var(--vscode-input-foreground);
+            border: 1px solid var(--vscode-input-border);
+            border-radius: 2px;
+        }
+        button {
+            background-color: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        button:hover {
+            background-color: var(--vscode-button-hoverBackground);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .results {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+        }
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: var(--vscode-list-hoverBackground);
+            border-radius: 2px;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: var(--vscode-descriptionForeground);
+        }
+        .error {
+            color: var(--vscode-errorForeground);
+            padding: 10px;
+            background-color: var(--vscode-inputValidation-errorBackground);
+            border-radius: 2px;
+        }
+        .file-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .file-item {
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 2px;
+        }
+        .file-item:hover {
+            background-color: var(--vscode-list-hoverBackground);
+        }
+        .explanation {
+            margin-top: 15px;
+            padding: 10px;
+            background-color: var(--vscode-textBlockQuote-background);
+            border-left: 3px solid var(--vscode-textLink-foreground);
+            border-radius: 2px;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            opacity: 0.7;
+        }
+        .tab.active {
+            border-bottom-color: var(--vscode-panelTitle-activeBorder);
+            opacity: 1;
+            font-weight: bold;
+        }
+        .tab:hover {
+            opacity: 1;
+            background-color: var(--vscode-list-hoverBackground);
+        }
+
+        /* Dashboard */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background-color: var(--vscode-editor-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: 4px;
+            padding: 15px;
+        }
+        .card h3 {
+            margin-top: 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            padding-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .badge {
+            background-color: var(--vscode-badge-background);
+            color: var(--vscode-badge-foreground);
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 0.8em;
+        }
+        .list-item {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            font-size: 0.9em;
+        }
+        .list-item:last-child {
+            border-bottom: none;
+        }
+        .tag-high { color: #f48771; border: 1px solid #f48771; padding: 1px 4px; border-radius: 2px; font-size: 0.8em; }
+        .tag-medium { color: #cca700; border: 1px solid #cca700; padding: 1px 4px; border-radius: 2px; font-size: 0.8em; }
+        .tag-low { color: #89d185; border: 1px solid #89d185; padding: 1px 4px; border-radius: 2px; font-size: 0.8em; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🗺️ Project Cartographer</h1>
+        
+        <div class="tabs">
+            <div class="tab active" data-tab="dashboard">Dashboard</div>
+            <div class="tab" data-tab="query">Ask Query</div>
+        </div>
+
+        <!-- Dashboard View -->
+        <div id="view-dashboard" class="tab-content">
+            <div id="dashboard-content" class="dashboard-grid">
+                <div class="loading">Waiting for agent data...</div>
+            </div>
+        </div>
+
+        <!-- Query View -->
+        <div id="view-query" class="tab-content" style="display: none;">
+            <div class="input-section">
+                <label for="question">Ask a question about your codebase:</label>
+                <input type="text" id="question" placeholder="e.g., What breaks if I change calculateTotal?" />
+                <button id="runButton">Run Query</button>
+            </div>
+            
+            <div id="loading" class="loading" style="display: none;">Analyzing codebase...</div>
+            <div id="error" class="error" style="display: none;"></div>
+            
+            <div id="results" class="results" style="display: none;">
+                <h2>Results</h2>
+                <div id="resultContent"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        (function() {
+            const vscode = acquireVsCodeApi();
+            
+            // Elements
+            const elements = {
+                questionInput: document.getElementById('question'),
+                runButton: document.getElementById('runButton'),
+                loadingDiv: document.getElementById('loading'),
+                errorDiv: document.getElementById('error'),
+                resultsDiv: document.getElementById('results'),
+                resultContent: document.getElementById('resultContent'),
+                dashboardContent: document.getElementById('dashboard-content'),
+                tabs: document.querySelectorAll('.tab'),
+                views: {
+                    dashboard: document.getElementById('view-dashboard'),
+                    query: document.getElementById('view-query')
+                }
+            };
+
+            // Initialize Tabs
+            elements.tabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    const tabId = tab.getAttribute('data-tab');
+                    if (tabId) switchTab(tabId);
+                });
+            });
+
+            function switchTab(tabId) {
+                // Update Tab UI
+                elements.tabs.forEach(t => {
+                    t.classList.toggle('active', t.getAttribute('data-tab') === tabId);
+                });
+                
+                // Update View Visibility
+                if (elements.views.dashboard) {
+                    elements.views.dashboard.style.display = tabId === 'dashboard' ? 'block' : 'none';
+                }
+                if (elements.views.query) {
+                    elements.views.query.style.display = tabId === 'query' ? 'block' : 'none';
+                }
+            }
+
+            // Event Listeners for Query UI
+            if (elements.runButton) {
+                elements.runButton.addEventListener('click', () => {
+                    if (!elements.questionInput) return;
+                    
+                    const question = elements.questionInput.value.trim();
+                    if (question) {
+                        setLoading(true);
+                        vscode.postMessage({
+                            command: 'runQuery',
+                            question: question
+                        });
+                    }
+                });
+            }
+
+            if (elements.questionInput) {
+                elements.questionInput.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter' && elements.runButton) {
+                        elements.runButton.click();
+                    }
+                });
+            }
+            
+            // Message Handler
+            window.addEventListener('message', event => {
+                const message = event.data;
+                switch (message.command) {
+                    case 'data':
+                        displayDashboard(message.data);
+                        break;
+                    case 'loading':
+                        setLoading(message.loading);
+                        break;
+                    case 'result':
+                        setLoading(false);
+                        displayResult(message.result);
+                        break;
+                    case 'error':
+                        setLoading(false);
+                        showError(message.error);
+                        break;
+                }
+            });
+
+            // Helpers
+            function log(msg) {
+                console.log(msg);
+            }
+
+            function setLoading(isLoading) {
+                if (elements.loadingDiv) elements.loadingDiv.style.display = isLoading ? 'block' : 'none';
+                if (elements.runButton) elements.runButton.disabled = isLoading;
+                if (elements.errorDiv) elements.errorDiv.style.display = 'none';
+                if (isLoading && elements.resultsDiv) elements.resultsDiv.style.display = 'none';
+                log('Loading state set to: ' + isLoading);
+            }
+
+            function showError(msg) {
+                log('Error shown: ' + msg);
+                if (elements.errorDiv) {
+                    elements.errorDiv.textContent = msg || 'Unknown error';
+                    elements.errorDiv.style.display = 'block';
+                }
+            }
+
+            function escapeHtml(text) {
+                if (typeof text !== 'string') text = String(text === null || text === undefined ? '' : text);
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            function displayDashboard(data) {
+                log('Displaying dashboard with data keys: ' + (data ? Object.keys(data).join(',') : 'null'));
+                if (!data || !elements.dashboardContent) return;
+                
+                let html = '';
+                try {
+                    // Risks
+                    const risks = data['risk-assessor'] || [];
+                    html += '<div class="card"><h3>⚠️ Risks <span class="badge">' + risks.length + '</span></h3>';
+                    html += '<div style="max-height: 200px; overflow-y: auto;">';
+                    if (risks.length > 0) {
+                        risks.slice(0, 10).forEach(risk => {
+                            html += '<div class="list-item"><span class="tag-' + (risk.severity || 'low').toLowerCase() + '">' + 
+                                    escapeHtml(risk.severity) + '</span> ' + escapeHtml(risk.message) + '</div>';
+                        });
+                    } else {
+                        html += '<p>No risks detected.</p>';
+                    }
+                    html += '</div></div>';
+
+                    // Hotspots
+                    const history = data['historian'] || [];
+                    html += '<div class="card"><h3>🔥 Hotspots</h3>';
+                    if (history.length > 0) {
+                        history.sort((a,b) => b.commits - a.commits).slice(0, 5).forEach(h => {
+                            html += '<div class="list-item"><strong>' + escapeHtml(h.file.split(/[/\\]/).pop()) + '</strong> (' + h.commits + ' changes)</div>';
+                        });
+                    } else {
+                        html += '<p>No history data.</p>';
+                    }
+                    html += '</div>';
+
+                    // Architecture
+                    const insights = data['architect'] || [];
+                    html += '<div class="card"><h3>🏗️ Architecture</h3>';
+                    if (insights.length > 0) {
+                        insights.forEach(i => html += '<div class="list-item">' + escapeHtml(i.message) + '</div>');
+                    } else {
+                        html += '<p>No architectural warnings.</p>';
+                    }
+                    html += '</div>';
+
+                    // Documentation
+                    const docs = data['translator'] || [];
+                    html += '<div class="card"><h3>📖 Documentation</h3>';
+                    if (docs.length > 0) {
+                        docs.forEach(d => {
+                            html += '<div class="list-item"><strong>' + escapeHtml(d.file.split(/[/\\]/).pop()) + '</strong><br><small>' + escapeHtml(d.summary) + '</small></div>';
+                        });
+                    } else {
+                        html += '<p>No auto-generated docs.</p>';
+                    }
+                    html += '</div>';
+                    
+                    elements.dashboardContent.innerHTML = html;
+                } catch (e) {
+                    elements.dashboardContent.innerHTML = '<p class="error">Error rendering dashboard: ' + escapeHtml(e.message) + '</p>';
+                }
+            }
+
+            function displayResult(result) {
+                if (!result || !elements.resultContent || !elements.resultsDiv) return;
+                
+                try {
+                    window.lastQueryResult = result;
+                    elements.resultsDiv.style.display = 'block';
+                    
+                    let html = '<div class="result-item">';
+                    html += '<strong>Intent:</strong> ' + escapeHtml(result.intent || 'unknown') + '<br>';
+                    
+                    if (result.contextPreview) {
+                        html += '<div class="explanation"><strong>Explanation:</strong><br>' + escapeHtml(result.contextPreview) + '</div>';
+                    }
+                    
+                    if (result.files && result.files.length > 0) {
+                        html += '<strong>Files (' + result.files.length + '):</strong><ul class="file-list">';
+                        result.files.slice(0, 20).forEach((file, index) => {
+                            const fileName = file.split(/[/\\]/).pop(); // Show only filename
+                            html += '<li class="file-item" data-index="' + index + '" title="' + escapeHtml(file) + '">' + 
+                                    '<span class="codicon codicon-file"></span> ' + escapeHtml(fileName) + 
+                                    '<span style="opacity:0.5; font-size:0.8em; margin-left:10px;">' + escapeHtml(file) + '</span></li>';
+                        });
+                        html += '</ul>';
+                    } else {
+                        html += '<p>No specific files identified.</p>';
+                    }
+                    
+                    if (result.functions && result.functions.length > 0) {
+                        html += '<strong>Functions (' + result.functions.length + '):</strong><ul>';
+                        result.functions.slice(0, 20).forEach(func => {
+                            html += '<li>' + escapeHtml(func) + '</li>';
+                        });
+                        html += '</ul>';
+                    }
+                    
+                    if (result.metadata) {
+                        html += '<div class="card" style="margin-top: 20px;"><h3>📊 Details</h3>';
+                        // ... simplified metadata ...
+                        html += '<details><summary>Raw Metadata</summary><pre style="white-space: pre-wrap;">' + escapeHtml(JSON.stringify(result.metadata, null, 2)) + '</pre></details>';
+                        html += '</div>';
+                    }
+                    
+                    html += '</div>';
+                    elements.resultContent.innerHTML = html;
+                    console.log('Result HTML set, resultsDiv should be visible');
+                } catch (e) {
+                    showError('Error rendering result: ' + e.message);
+                }
+            }
+            
+            // Event Delegation for File Clicks
+            if (elements.resultContent) {
+                elements.resultContent.addEventListener('click', (e) => {
+                    const fileItem = e.target.closest('.file-item');
+                    if (fileItem) {
+                        const index = parseInt(fileItem.getAttribute('data-index'));
+                        if (!isNaN(index) && window.lastQueryResult && window.lastQueryResult.files[index]) {
+                            vscode.postMessage({
+                                command: 'openFile',
+                                file: window.lastQueryResult.files[index]
+                            });
+                        }
+                    }
+                });
+            }
+
+        })();
+    </script>
+</body>
+</html>

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenAI } from '@google/genai';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -10,12 +10,12 @@ import * as path from 'path';
  * The LLM never decides what to analyze - that's done by the graph queries.
  */
 export class GeminiClient {
-    private genAI: GoogleGenerativeAI | null = null;
+    private genAI: GoogleGenAI | null = null;
     private enabled: boolean = false;
 
     constructor(context: vscode.ExtensionContext) {
         this.initialize(context);
-        
+
         // Listen for configuration changes
         context.subscriptions.push(
             vscode.workspace.onDidChangeConfiguration(e => {
@@ -24,18 +24,36 @@ export class GeminiClient {
                 }
             })
         );
+
+        // Listen for .env file changes
+        const watcher = vscode.workspace.createFileSystemWatcher('**/.env');
+        watcher.onDidChange(() => {
+            console.log('.env file changed, re-initializing Gemini client...');
+            this.initialize(context);
+        });
+        watcher.onDidCreate(() => {
+            console.log('.env file created, re-initializing Gemini client...');
+            this.initialize(context);
+        });
+        watcher.onDidDelete(() => {
+            console.log('.env file deleted, re-initializing Gemini client...');
+            this.initialize(context);
+        });
+        context.subscriptions.push(watcher);
     }
 
     private initialize(context: vscode.ExtensionContext) {
         // Try to get API key from .env file first
         let apiKey = this.getApiKeyFromEnv();
-        
+        let source = '.env';
+
         // Fallback to VS Code settings if .env doesn't have it
         if (!apiKey) {
             const config = vscode.workspace.getConfiguration('projectCartographer');
             apiKey = config.get<string>('geminiApiKey', '');
+            source = 'settings';
         }
-        
+
         // Enable LLM if we have an API key (from .env or settings)
         // Or check VS Code setting if no .env key
         const config = vscode.workspace.getConfiguration('projectCartographer');
@@ -44,40 +62,46 @@ export class GeminiClient {
 
         if (apiKey) {
             try {
-                this.genAI = new GoogleGenerativeAI(apiKey);
-                console.log('Gemini API initialized successfully');
+                this.genAI = new GoogleGenAI({ apiKey: apiKey });
+                const maskedKey = apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4);
+                console.log(`Gemini API initialized successfully (source: ${source}, key: ${maskedKey})`);
             } catch (error) {
                 console.error('Failed to initialize Gemini client:', error);
                 this.genAI = null;
                 this.enabled = false;
             }
         } else {
+            console.log('Gemini API key not found. LLM features disabled.');
             this.genAI = null;
             if (this.enabled) {
-                console.warn('Gemini API key not found. Please add GEMINI_API_KEY to .env file or VS Code settings.');
+                console.warn('Gemini enabled in settings but no key found.');
             }
         }
     }
-    
+
     private getApiKeyFromEnv(): string | null {
         try {
             // Get workspace folder
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
             if (!workspaceFolder) {
+                console.log('[GeminiClient] No workspace folder found');
                 return null;
             }
-            
+
             // Look for .env file in workspace root
             const envPath = path.join(workspaceFolder.uri.fsPath, '.env');
-            
+            console.log(`[GeminiClient] Looking for .env at: ${envPath}`);
+
             if (!fs.existsSync(envPath)) {
+                console.log('[GeminiClient] .env file NOT found');
                 return null;
             }
-            
+
             // Read .env file
             const envContent = fs.readFileSync(envPath, 'utf-8');
+            console.log(`[GeminiClient] Read .env file (${envContent.length} bytes)`);
             const lines = envContent.split('\n');
-            
+
             // Parse .env file (simple parser)
             for (const line of lines) {
                 const trimmed = line.trim();
@@ -85,22 +109,23 @@ export class GeminiClient {
                 if (!trimmed || trimmed.startsWith('#')) {
                     continue;
                 }
-                
+
                 // Look for GEMINI_API_KEY
                 const match = trimmed.match(/^GEMINI_API_KEY\s*=\s*(.+)$/);
                 if (match) {
                     // Remove quotes if present
                     const key = match[1].trim().replace(/^["']|["']$/g, '');
                     if (key) {
-                        console.log('Found GEMINI_API_KEY in .env file');
+                        console.log('[GeminiClient] Found GEMINI_API_KEY in .env file');
                         return key;
                     }
                 }
             }
+            console.log('[GeminiClient] GEMINI_API_KEY not found in .env file contents');
         } catch (error) {
-            console.warn('Failed to read .env file:', error);
+            console.warn('[GeminiClient] Failed to read .env file:', error);
         }
-        
+
         return null;
     }
 
@@ -124,8 +149,6 @@ export class GeminiClient {
         }
 
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
-
             const prompt = this.buildExplanationPrompt(
                 question,
                 intent,
@@ -135,9 +158,12 @@ export class GeminiClient {
                 contextPreview
             );
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+            const result = await this.genAI.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: prompt
+            });
+
+            return result.text || null;
         } catch (error) {
             console.error('Gemini API error:', error);
             return null;
@@ -188,10 +214,8 @@ Keep it under 200 words.`;
         }
 
         try {
-            const model = this.genAI.getGenerativeModel({ model: 'gemini-pro' });
-
             // Build context from project files
-            const codeContext = projectFiles.map(file => 
+            const codeContext = projectFiles.map(file =>
                 `=== ${file.path} ===\n${file.content}\n`
             ).join('\n');
 
@@ -207,9 +231,12 @@ Please answer the user's question based on the code you see. Be specific, refere
 
 Keep your answer clear and concise.`;
 
-            const result = await model.generateContent(prompt);
-            const response = await result.response;
-            return response.text();
+            const result = await this.genAI.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: prompt
+            });
+
+            return result.text || null;
         } catch (error) {
             console.error('Gemini API error:', error);
             return null;
