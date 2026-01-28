@@ -155,69 +155,123 @@
         }
 
         /* Dashboard */
+        /* Dashboard 2.0 Grid */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: auto auto 1fr;
             gap: 20px;
+            padding-bottom: 20px;
         }
 
         .card {
             background-color: var(--vscode-editor-background);
             border: 1px solid var(--vscode-panel-border);
-            border-radius: 4px;
-            padding: 15px;
+            border-radius: 8px;
+            /* Softer corners */
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            border-color: var(--vscode-focusBorder);
         }
 
         .card h3 {
             margin-top: 0;
             border-bottom: 1px solid var(--vscode-panel-border);
             padding-bottom: 10px;
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            font-weight: 600;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .badge {
-            background-color: var(--vscode-badge-background);
-            color: var(--vscode-badge-foreground);
-            padding: 2px 6px;
-            border-radius: 10px;
-            font-size: 0.8em;
+        /* KPI Cards (Top Row) */
+        .card.kpi {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+        }
+
+        .kpi-value {
+            font-size: 3em;
+            font-weight: 700;
+            margin: 10px 0;
+            background: linear-gradient(135deg, #61dafb, #d87df1);
+            background-clip: text;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .kpi-label {
+            font-size: 0.9em;
+            color: var(--vscode-descriptionForeground);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* Health Grade Colors */
+        .grade-A {
+            color: #89d185;
+            -webkit-text-fill-color: #89d185;
+        }
+
+        .grade-B {
+            color: #cca700;
+            -webkit-text-fill-color: #cca700;
+        }
+
+        .grade-C {
+            color: #f48771;
+            -webkit-text-fill-color: #f48771;
+        }
+
+        .grade-F {
+            color: #ff0000;
+            -webkit-text-fill-color: #ff0000;
+        }
+
+        /* Chart Containers */
+        .chart-container {
+            width: 100%;
+            height: 200px;
+            position: relative;
+        }
+
+        /* List Items */
+        .list-container {
+            overflow-y: auto;
+            max-height: 250px;
         }
 
         .list-item {
-            padding: 8px 0;
+            padding: 10px;
             border-bottom: 1px solid var(--vscode-panel-border);
-            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
-        .list-item:last-child {
-            border-bottom: none;
+        .list-item:hover {
+            background: var(--vscode-list-hoverBackground);
         }
 
-        .tag-high {
-            color: #f48771;
-            border: 1px solid #f48771;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 0.8em;
+        /* Span Helpers */
+        .col-span-2 {
+            grid-column: span 2;
         }
 
-        .tag-medium {
-            color: #cca700;
-            border: 1px solid #cca700;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 0.8em;
+        .col-span-3 {
+            grid-column: span 3;
         }
 
-        .tag-low {
-            color: #89d185;
-            border: 1px solid #89d185;
-            padding: 1px 4px;
-            border-radius: 2px;
-            font-size: 0.8em;
-        }
 
         /* Graph styles */
         #graph-view {
@@ -787,63 +841,277 @@
             }
 
             function displayDashboard(data) {
-                log('Displaying dashboard with data keys: ' + (data ? Object.keys(data).join(',') : 'null'));
+                log('Displaying dashboard 2.0');
                 if (!data || !elements.dashboardContent) return;
 
-                let html = '';
                 try {
-                    // Risks
                     const risks = data['risk-assessor'] || [];
-                    html += '<div class="card"><h3>⚠️ Risks <span class="badge">' + risks.length + '</span></h3>';
-                    html += '<div style="max-height: 200px; overflow-y: auto;">';
-                    if (risks.length > 0) {
-                        risks.slice(0, 10).forEach(risk => {
-                            html += '<div class="list-item"><span class="tag-' + (risk.severity || 'low').toLowerCase() + '">' +
-                                escapeHtml(risk.severity) + '</span> ' + escapeHtml(risk.message) + '</div>';
-                        });
-                    } else {
-                        html += '<p>No risks detected.</p>';
-                    }
-                    html += '</div></div>';
-
-                    // Hotspots
                     const history = data['historian'] || [];
-                    html += '<div class="card"><h3>🔥 Hotspots</h3>';
-                    if (history.length > 0) {
-                        history.sort((a, b) => b.commits - a.commits).slice(0, 5).forEach(h => {
-                            html += '<div class="list-item"><strong>' + escapeHtml(h.file.split(/[/\\]/).pop()) + '</strong> (' + h.commits + ' changes)</div>';
-                        });
-                    } else {
-                        html += '<p>No history data.</p>';
-                    }
-                    html += '</div>';
-
-                    // Architecture
                     const insights = data['architect'] || [];
-                    html += '<div class="card"><h3>🏗️ Architecture</h3>';
-                    if (insights.length > 0) {
-                        insights.forEach(i => html += '<div class="list-item">' + escapeHtml(i.message) + '</div>');
-                    } else {
-                        html += '<p>No architectural warnings.</p>';
-                    }
-                    html += '</div>';
 
-                    // Documentation
-                    const docs = data['translator'] || [];
-                    html += '<div class="card"><h3>📖 Documentation</h3>';
-                    if (docs.length > 0) {
-                        docs.forEach(d => {
-                            html += '<div class="list-item"><strong>' + escapeHtml(d.file.split(/[/\\]/).pop()) + '</strong><br><small>' + escapeHtml(d.summary) + '</small></div>';
+                    // 1. Calculate Health Score (Smart Scoring)
+                    let baseScore = 100;
+                    let highRisks = 0;
+                    let medRisks = 0;
+                    let lowRisks = 0;
+
+                    // Weighted penalties with caps to prevent "F" for working projects
+                    let medPenalty = 0;
+                    let lowPenalty = 0;
+
+                    risks.forEach(r => {
+                        if (r.severity === 'HIGH') {
+                            baseScore -= 15; // Critical issues hit hard (uncapped)
+                            highRisks++;
+                        }
+                        else if (r.severity === 'MEDIUM') {
+                            medPenalty += 3;
+                            medRisks++;
+                        }
+                        else {
+                            lowPenalty += 0.5;
+                            lowRisks++;
+                        }
+                    });
+
+                    // Cap penalties
+                    baseScore -= Math.min(40, medPenalty); // Max -40 for medium
+                    baseScore -= Math.min(20, lowPenalty); // Max -20 for low
+
+                    let score = Math.max(0, Math.floor(baseScore)); // Floor at 0, integer
+
+                    let grade = 'A';
+                    let gradeClass = 'grade-A';
+                    if (score < 90) { grade = 'B'; gradeClass = 'grade-B'; }
+                    if (score < 75) { grade = 'C'; gradeClass = 'grade-C'; }
+                    if (score < 50) { grade = 'F'; gradeClass = 'grade-F'; }
+
+                    // 1b. Generate Smart Action Plan (Insights)
+                    const actionPlan = [];
+                    // Cross-reference Hotspots + Risks
+                    history.sort((a, b) => b.commits - a.commits).slice(0, 10).forEach(h => {
+                        const fileName = h.file.split(/[/\\]/).pop();
+                        // Find risks for this file
+                        const fileRisks = risks.filter(r => r.file && r.file.endsWith(fileName));
+                        const highRisk = fileRisks.find(r => r.severity === 'HIGH');
+                        const medRisk = fileRisks.find(r => r.severity === 'MEDIUM');
+
+                        if (highRisk) {
+                            actionPlan.push({
+                                type: 'urgent',
+                                msg: `<b>Refactor Candidate:</b> ${fileName} is changed often (${h.commits} times) but has critical issues.`,
+                                tags: ['Hotspot', 'High Risk']
+                            });
+                        } else if (medRisk && h.commits > 10) {
+                            actionPlan.push({
+                                type: 'warning',
+                                msg: `<b>Tech Debt:</b> ${fileName} is active (${h.commits} commits) but has warnings.`,
+                                tags: ['Hotspot', 'Medium Risk']
+                            });
+                        }
+                    });
+
+                    // Check for Isolated but complex files? (Future)
+
+                    // 2. Build HTML Grid
+                    let html = '';
+
+                    // -- ROW 1: KPI Cards --
+                    html += `
+                        <div class="card kpi">
+                            <span class="kpi-label">Project Health</span>
+                            <div class="kpi-value ${gradeClass}">${grade}</div>
+                            <small>${score} / 100</small>
+                        </div>
+                        <div class="card kpi">
+                            <span class="kpi-label">Total Risks</span>
+                            <div class="kpi-value" style="-webkit-text-fill-color: var(--vscode-editor-foreground)">${risks.length}</div>
+                            <small>${highRisks} Critical</small>
+                        </div>
+                        <div class="card kpi">
+                            <span class="kpi-label">Hotspots</span>
+                            <div class="kpi-value" style="-webkit-text-fill-color: var(--vscode-editor-foreground)">${history.length}</div>
+                            <small>Files changed recently</small>
+                        </div>
+                    `;
+
+                    // -- ROW 2: Analytics --
+                    // Risk Chart
+                    html += `
+                        <div class="card col-span-2">
+                            <h3>📊 Risk Distribution</h3>
+                            <div id="risk-chart" class="chart-container"></div>
+                        </div>
+                    `;
+
+                    // Hotspot Chart
+                    html += `
+                        <div class="card">
+                            <h3>🔥 Top Hotspots</h3>
+                             <div id="hotspot-chart" class="chart-container"></div>
+                        </div>
+                    `;
+
+                    // -- ROW 3: Action Plan (New) --
+                    html += `<div class="card col-span-3">
+                        <h3>💡 Smart Action Plan <span class="badge" style="margin-left:10px">Recommended</span></h3>
+                        <div class="list-container">`;
+
+                    if (actionPlan.length > 0) {
+                        actionPlan.forEach(action => {
+                            let icon = action.type === 'urgent' ? '🚨' : '⚠️';
+                            html += `<div class="list-item">
+                                <div style="display:flex; align-items:center; gap:10px">
+                                    <span>${icon}</span>
+                                    <span>${action.msg}</span>
+                                </div>
+                                <div style="display:flex; gap:5px">
+                                    ${action.tags.map(t => `<span class="badge">${t}</span>`).join('')}
+                                </div>
+                             </div>`;
+                        });
+                    } else if (highRisks > 0) {
+                        // Fallback if no hotspot overlap
+                        html += `<div class="list-item"><span>🚨 Address the <b>${highRisks} Critical Risks</b> found in your codebase.</span></div>`;
+                    } else {
+                        html += `<div class="list-item"><span>✨ No immediate actions required. Keep up the good work!</span></div>`;
+                    }
+                    html += `</div></div>`;
+
+
+                    // -- ROW 4: Details (Collapsed/Smaller) --
+                    // Architecture
+                    html += `<div class="card col-span-2"><div class="list-container">
+                        <h3>🏗️ Architecture Insights</h3>`;
+                    if (insights.length > 0) {
+                        insights.slice(0, 5).forEach(i => {
+                            html += `<div class="list-item"><small>${escapeHtml(i.message)}</small></div>`;
                         });
                     } else {
-                        html += '<p>No auto-generated docs.</p>';
+                        html += `<p style="padding:10px;">No architectural warnings.</p>`;
                     }
-                    html += '</div>';
+                    html += `</div></div>`;
+
+                    // Re-Analyze Button (Visual)
+                    html += `<div class="card" style="justify-content:center; align-items:center;">
+                        <button onclick="window.location.reload()" style="padding:10px 20px; font-size:1.1em; cursor:pointer">🔄 Re-Analyze Project</button>
+                    </div>`;
 
                     elements.dashboardContent.innerHTML = html;
+
+                    // 3. Render Charts (must happen after HTML is injected)
+                    requestAnimationFrame(() => {
+                        renderRiskChart(highRisks, medRisks, lowRisks);
+                        renderHotspotChart(history);
+                    });
+
                 } catch (e) {
+                    console.error(e);
                     elements.dashboardContent.innerHTML = '<p class="error">Error rendering dashboard: ' + escapeHtml(e.message) + '</p>';
                 }
+            }
+
+            // --- D3 Chart Functions ---
+
+            function renderRiskChart(high, med, low) {
+                const container = document.getElementById('risk-chart');
+                if (!container) return;
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                const radius = Math.min(width, height) / 2 - 10;
+
+                const svg = d3.select('#risk-chart')
+                    .append('svg')
+                    .attr('width', width)
+                    .attr('height', height)
+                    .append('g')
+                    .attr('transform', `translate(${width / 2},${height / 2})`);
+
+                const data = { High: high, Medium: med, Low: low };
+                const color = d3.scaleOrdinal()
+                    .domain(['High', 'Medium', 'Low'])
+                    .range(['#f48771', '#cca700', '#89d185']);
+
+                const pie = d3.pie().value(d => d[1]).sort(null);
+                const data_ready = pie(Object.entries(data));
+
+                const arc = d3.arc().innerRadius(radius * 0.5).outerRadius(radius * 0.8);
+
+                svg.selectAll('allSlices')
+                    .data(data_ready)
+                    .join('path')
+                    .attr('d', arc)
+                    .attr('fill', d => color(d.data[0]))
+                    .attr('stroke', 'var(--vscode-editor-background)')
+                    .style('stroke-width', '2px')
+                    .style('opacity', 0.8);
+
+                // Add total in center
+                svg.append("text")
+                    .attr("text-anchor", "middle")
+                    .attr("dy", "0.35em")
+                    .style("fill", "var(--vscode-editor-foreground)")
+                    .style("font-size", "1.5em")
+                    .style("font-weight", "bold")
+                    .text(high + med + low);
+            }
+
+            function renderHotspotChart(history) {
+                const container = document.getElementById('hotspot-chart');
+                if (!container) return;
+
+                // Sort by commits and take top 5
+                const data = history.sort((a, b) => b.commits - a.commits).slice(0, 5);
+
+                // Increased left margin to 120 (was 100) and bottom to 50
+                const margin = { top: 10, right: 10, bottom: 50, left: 120 };
+                const width = container.clientWidth - margin.left - margin.right;
+                const height = container.clientHeight - margin.top - margin.bottom;
+
+                const svg = d3.select('#hotspot-chart')
+                    .append('svg')
+                    .attr('width', width + margin.left + margin.right)
+                    .attr('height', height + margin.top + margin.bottom)
+                    .append('g')
+                    .attr('transform', `translate(${margin.left},${margin.top})`);
+
+                const x = d3.scaleLinear()
+                    .domain([0, d3.max(data, d => d.commits) || 10])
+                    .range([0, width]);
+
+                const y = d3.scaleBand()
+                    .range([0, height])
+                    .domain(data.map(d => {
+                        // Truncate if too long (max 15 chars)
+                        const name = d.file.split(/[/\\]/).pop();
+                        return name.length > 15 ? name.substring(0, 12) + '...' : name;
+                    }))
+                    .padding(.2);
+
+                svg.append("g")
+                    .attr("transform", `translate(0,${height})`)
+                    .call(d3.axisBottom(x).ticks(5))
+                    .selectAll("text")
+                    .attr("transform", "translate(-10,0)rotate(-45)")
+                    .style("text-anchor", "end");
+
+                svg.append("g")
+                    .call(d3.axisLeft(y));
+
+                svg.selectAll("myRect")
+                    .data(data)
+                    .join("rect")
+                    .attr("x", x(0))
+                    .attr("y", d => {
+                        const name = d.file.split(/[/\\]/).pop();
+                        return y(name.length > 15 ? name.substring(0, 12) + '...' : name);
+                    })
+                    .attr("width", d => x(d.commits))
+                    .attr("height", y.bandwidth())
+                    .attr("fill", "#61dafb")
+                    .style("opacity", 0.7)
+                    .on("mouseover", function () { d3.select(this).style("opacity", 1); })
+                    .on("mouseout", function () { d3.select(this).style("opacity", 0.7); });
             }
 
             function displayResult(result) {
