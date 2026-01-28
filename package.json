@@ -20,15 +20,6 @@
         "title": "Open Project Cartographer"
       }
     ],
-    "views": {
-      "explorer": [
-        {
-          "id": "projectCartographerView",
-          "name": "Project Cartographer",
-          "when": "workspaceFolderCount > 0"
-        }
-      ]
-    },
     "configuration": {
       "title": "Project Cartographer",
       "properties": {

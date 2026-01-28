@@ -14,6 +14,7 @@ import { KnowledgeGraph } from './graph/knowledgeGraph';
 import { QueryOrchestrator } from './orchestrator';
 import { GeminiClient } from './llm/geminiClient';
 import { createWebviewPanel } from './ui/webview';
+// import { SidebarProvider } from './ui/sidebarProvider'; // Removed
 
 let graph: KnowledgeGraph | null = null;
 let orchestrator: QueryOrchestrator | null = null;
@@ -37,6 +38,14 @@ export async function activate(context: vscode.ExtensionContext) {
         const panel = createWebviewPanel(context.extensionUri, graph, orchestrator, agentData);
         context.subscriptions.push(panel);
     });
+
+    // 4. Status Bar Item (Launcher)
+    const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+    statusBarItem.text = "$(map) Project Cartographer";
+    statusBarItem.command = 'projectCartographer.openView';
+    statusBarItem.tooltip = "Open Project Cartographer Dashboard";
+    statusBarItem.show();
+    context.subscriptions.push(statusBarItem);
 
     context.subscriptions.push(disposable);
 
