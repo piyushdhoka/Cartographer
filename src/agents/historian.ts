@@ -8,6 +8,7 @@ export interface FileHistory {
     commits: number;
     authors: Set<string>;
     lastModified: Date;
+    latestCommitSHA: string;
 }
 
 export class HistorianAgent extends Agent {
@@ -45,17 +46,17 @@ export class HistorianAgent extends Agent {
         const historyMap = new Map<string, FileHistory>();
         let currentAuthor = '';
         let currentDate = new Date();
+        let currentCommitSHA = '';
 
         const lines = output.split('\n');
         for (const line of lines) {
             if (!line.trim()) continue;
 
             if (line.startsWith('commit:')) {
-                const parts = line.split('|');
-                if (parts.length >= 3) {
-                    currentAuthor = parts[1];
-                    currentDate = new Date(parts[2]);
-                }
+                const parts = line.substring(7).split('|');
+                currentCommitSHA = parts[0] || '';
+                currentAuthor = parts[1] || 'Unknown';
+                currentDate = new Date(parts[2] || Date.now());
             } else {
                 // It's a file path
                 const filePath = path.join(workspacePath, line.trim());
@@ -65,7 +66,8 @@ export class HistorianAgent extends Agent {
                         file: filePath,
                         commits: 0,
                         authors: new Set(),
-                        lastModified: new Date(0) // Epoch
+                        lastModified: new Date(0), // Epoch
+                        latestCommitSHA: ''
                     });
                 }
 
@@ -74,6 +76,7 @@ export class HistorianAgent extends Agent {
                 entry.authors.add(currentAuthor);
                 if (currentDate > entry.lastModified) {
                     entry.lastModified = currentDate;
+                    entry.latestCommitSHA = currentCommitSHA;
                 }
             }
         }

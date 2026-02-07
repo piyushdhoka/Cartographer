@@ -98,7 +98,7 @@ export function createWebviewPanel(
             }
         }
 
-        // Mark truly isolated nodes
+        // Mark truly isolatits ed nodes
         const connectedIds = new Set();
         links.forEach(l => {
             connectedIds.add(l.source);
@@ -193,6 +193,81 @@ export function createWebviewPanel(
                     }
                     break;
 
+                case 'showFileDiff':
+                    try {
+                        const { filePath, commitSHA } = message;
+                        if (!filePath || !commitSHA) {
+                            throw new Error('File path and commit SHA are required');
+                        }
+
+                        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+                        if (!workspaceFolder) {
+                            throw new Error('No workspace folder found');
+                        }
+
+                        // Get relative path
+                        const relativePath = filePath.startsWith(workspaceFolder.uri.fsPath)
+                            ? path.relative(workspaceFolder.uri.fsPath, filePath)
+                            : filePath;
+
+                        const fileName = path.basename(filePath);
+                        const shortSHA = commitSHA.substring(0, 7);
+
+                        // Use git show to get file contents at specific commits
+                        const { spawn } = require('child_process');
+                        const getFileAtCommit = (ref: string): Promise<string> => {
+                            return new Promise((resolve, reject) => {
+                                const git = spawn('git', ['show', `${ref}:${relativePath}`], {
+                                    cwd: workspaceFolder.uri.fsPath
+                                });
+                                let stdout = '';
+                                let stderr = '';
+                                git.stdout.on('data', (data: Buffer) => stdout += data);
+                                git.stderr.on('data', (data: Buffer) => stderr += data);
+                                git.on('close', (code: number) => {
+                                    if (code !== 0) reject(new Error(stderr));
+                                    else resolve(stdout);
+                                });
+                            });
+                        };
+
+                        // Get content from both commits
+                        const [oldContent, newContent] = await Promise.all([
+                            getFileAtCommit(`${commitSHA}~1`),
+                            getFileAtCommit(commitSHA)
+                        ]);
+
+                        // Create temporary files
+                        const os = require('os');
+                        const tmpDir = os.tmpdir();
+                        const oldFilePath = path.join(tmpDir, `${fileName}.${shortSHA}~1`);
+                        const newFilePath = path.join(tmpDir, `${fileName}.${shortSHA}`);
+
+                        fs.writeFileSync(oldFilePath, oldContent);
+                        fs.writeFileSync(newFilePath, newContent);
+
+                        const oldUri = vscode.Uri.file(oldFilePath);
+                        const newUri = vscode.Uri.file(newFilePath);
+                        const title = `${fileName} (${shortSHA}~1 ↔ ${shortSHA})`;
+
+                        // Open the diff editor
+                        await vscode.commands.executeCommand('vscode.diff', oldUri, newUri, title);
+
+                        // Clean up temp files after a delay
+                        setTimeout(() => {
+                            try {
+                                fs.unlinkSync(oldFilePath);
+                                fs.unlinkSync(newFilePath);
+                            } catch (e) {
+                                // Ignore cleanup errors
+                            }
+                        }, 30000); // 30 seconds
+
+                    } catch (error) {
+                        vscode.window.showErrorMessage(`Failed to show diff: ${String(error)}`);
+                    }
+                    break;
+
                 case 'getGraphData':
                     try {
                         const payload = getGraphPayload();
@@ -249,6 +324,88 @@ export function createWebviewPanel(
                         }
                     } catch (error) {
                         vscode.window.showErrorMessage(`Failed to load snapshot: ${String(error)}`);
+                    }
+                    break;
+
+                case 'getCommitTimeline':
+                    try {
+                        const historianData = data?.['historian'] || [];
+
+                        // Transform historian data into timeline format
+                        const commitsByDate = new Map<string, number>();
+                        const recentCommits: any[] = [];
+
+                        // Collect all file histories
+                        historianData.forEach((fileHist: any) => {
+                            const dateKey = new Date(fileHist.lastModified).toISOString().split('T')[0];
+                            commitsByDate.set(dateKey, (commitsByDate.get(dateKey) || 0) + fileHist.commits);
+
+                            recentCommits.push({
+                                file: path.basename(fileHist.file),
+                                fullPath: fileHist.file,
+                                commits: fileHist.commits,
+                                authors: fileHist.authors || [],
+                                lastModified: fileHist.lastModified,
+                                commitSHA: fileHist.latestCommitSHA || ''
+                            });
+                        });
+
+                        // Sort by last modified (most recent first)
+                        recentCommits.sort((a, b) =>
+                            new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime()
+                        );
+
+                        // Convert map to array for frontend
+                        const timelineData = Array.from(commitsByDate.entries())
+                            .map(([date, count]) => ({ date, commits: count }))
+                            .sort((a, b) => b.date.localeCompare(a.date));
+
+                        panel.webview.postMessage({
+                            command: 'commitTimeline',
+                            timeline: timelineData,
+                            recentCommits: recentCommits.slice(0, 50), // Limit to 50 most recent
+                            totalFiles: historianData.length
+                        });
+                    } catch (error) {
+                        console.error('Get commit timeline error:', error);
+                        panel.webview.postMessage({
+                            command: 'commitTimeline',
+                            timeline: [],
+                            recentCommits: [],
+                            totalFiles: 0
+                        });
+                    }
+                    break;
+
+                case 'getFileHistory':
+                    try {
+                        const targetFile = message.filepath;
+                        const historianData = data?.['historian'] || [];
+
+                        // Find the specific file's history
+                        const fileHistory = historianData.find((fh: any) =>
+                            fh.file === targetFile || fh.file.endsWith(targetFile)
+                        );
+
+                        if (fileHistory) {
+                            panel.webview.postMessage({
+                                command: 'fileHistory',
+                                data: {
+                                    file: fileHistory.file,
+                                    commits: fileHistory.commits,
+                                    authors: fileHistory.authors || [],
+                                    lastModified: fileHistory.lastModified
+                                }
+                            });
+                        } else {
+                            panel.webview.postMessage({
+                                command: 'fileHistory',
+                                data: null
+                            });
+                        }
+                    } catch (error) {
+                        console.error('Get file history error:', error);
+                        panel.webview.postMessage({ command: 'fileHistory', data: null });
                     }
                     break;
             }

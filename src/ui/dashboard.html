@@ -158,10 +158,28 @@
         /* Dashboard 2.0 Grid */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            grid-template-rows: auto auto 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 20px;
             padding-bottom: 20px;
+        }
+
+        /* Responsive adjustments */
+        @media (min-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 899px) and (min-width: 600px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 599px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .card {
@@ -174,6 +192,8 @@
             transition: transform 0.2s;
             display: flex;
             flex-direction: column;
+            min-width: 0;
+            /* Prevent grid blowout */
         }
 
         .card:hover {
@@ -257,6 +277,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 5px;
         }
 
         .list-item:hover {
@@ -270,6 +292,14 @@
 
         .col-span-3 {
             grid-column: span 3;
+        }
+
+        @media (max-width: 899px) {
+
+            .col-span-2,
+            .col-span-3 {
+                grid-column: span 1;
+            }
         }
 
 
@@ -287,6 +317,7 @@
             border-radius: 4px;
             background: var(--vscode-editor-background);
             position: relative;
+            overflow: hidden;
         }
 
         #graph-context {
@@ -307,6 +338,13 @@
             /* Add shadow for floating effect */
             pointer-events: auto;
             /* Enable scrolling */
+        }
+
+        @media (max-width: 599px) {
+            #graph-context {
+                width: 220px;
+                font-size: 0.9em;
+            }
         }
 
         #graph-context h3 {
@@ -343,27 +381,37 @@
 
         .graph-controls {
             margin-bottom: 10px;
-            display: flex;
-            gap: 10px;
-            flex-wrap: nowrap;
-            align-items: center;
+            white-space: nowrap;
+            overflow-x: auto;
         }
 
         .graph-controls button,
         .graph-controls select {
-            padding: 4px 8px;
-            /* Smaller padding */
-            font-size: 12px;
-            /* Smaller text */
+            display: inline-block;
+            width: auto !important;
+            /* Override global width: 100% */
+            white-space: nowrap;
+            margin-right: 8px;
+            margin-bottom: 0;
+            /* Override global margin-bottom */
+            padding: 6px 10px;
+            font-size: 0.85em;
             background: var(--vscode-button-background);
             color: var(--vscode-button-foreground);
             border: none;
             border-radius: 3px;
             cursor: pointer;
+            vertical-align: middle;
         }
 
         .graph-controls button:hover {
             background: var(--vscode-button-hoverBackground);
+        }
+
+        .graph-controls select {
+            background: var(--vscode-dropdown-background);
+            color: var(--vscode-dropdown-foreground);
+            border: 1px solid var(--vscode-dropdown-border);
         }
 
         .node {
@@ -454,6 +502,7 @@
                 <button id="saveSnapshot">📸 Save Snapshot</button>
                 <button id="toggleLabels">Hide Labels</button>
                 <button id="clearSelection">Clear Selection</button>
+                <button id="toggleTimeline">📅 Timeline</button>
                 <select id="filterType">
                     <option value="all">All Nodes</option>
                     <option value="connected">Connected Only</option>
@@ -467,12 +516,44 @@
                     <option value="live">🔴 Live View</option>
                 </select>
             </div>
-            <div id="graph-container">
-                <svg id="graph-svg"></svg>
-                <div id="graph-tooltip"></div>
-                <div id="graph-context" style="display: none;">
-                    <h3 id="context-title"></h3>
-                    <div id="context-content"></div>
+
+            <div id="graph-split-container" style="display: flex; gap: 10px; height: calc(100vh - 250px);">
+                <!-- Timeline Panel (Left, collapsible) -->
+                <div id="timeline-panel"
+                    style="display: none; width: 320px; border: 1px solid var(--vscode-panel-border); border-radius: 4px; background: var(--vscode-editor-background); flex-direction: column; overflow: hidden; transition: all 0.3s;">
+                    <div style="padding: 10px; border-bottom: 1px solid var(--vscode-panel-border);">
+                        <h3 style="margin: 0; font-size: 1em;">📅 Git Timeline</h3>
+                    </div>
+
+                    <div id="timeline-content" style="overflow-y: auto; flex: 1; padding: 10px;">
+                        <div
+                            style="margin-bottom: 15px; padding: 10px; background: rgba(97, 218, 251, 0.1); border-radius: 4px; border-left: 3px solid #61dafb;">
+                            <div style="font-size: 0.85em; opacity: 0.8;">Total Files Tracked</div>
+                            <div id="total-files" style="font-size: 1.5em; font-weight: bold;">0</div>
+                        </div>
+
+                        <div style="margin-bottom: 10px;">
+                            <input type="text" id="timelineSearch" placeholder="🔍 Filter files..."
+                                style="width: 100%; padding: 5px; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 3px;">
+                        </div>
+
+                        <h4 style="margin: 10px 0 5px 0; font-size: 0.9em; opacity: 0.8;">Recent Changes</h4>
+                        <div id="recent-commits" style="max-height: 500px; overflow-y: auto;">
+                            <div style="padding: 20px; text-align: center; opacity: 0.5;">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Graph Panel (Right) -->
+                <div id="graph-main-panel" style="flex: 1; min-width: 0;">
+                    <div id="graph-container">
+                        <svg id="graph-svg"></svg>
+                        <div id="graph-tooltip"></div>
+                        <div id="graph-context" style="display: none;">
+                            <h3 id="context-title"></h3>
+                            <div id="context-content"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -591,6 +672,18 @@
                         }
                         break;
 
+                    case 'commitTimeline':
+                        // Render timeline data
+                        renderCommitTimeline(message.timeline, message.recentCommits, message.totalFiles);
+                        break;
+
+                    case 'fileHistory':
+                        // Update context panel or timeline with file-specific history
+                        if (message.data) {
+                            console.log('File history:', message.data);
+                        }
+                        break;
+
                     case 'graphData':
                         window.currentGraphData = message.data;
                         // If we have a snapshot loaded, re-render with diff
@@ -607,7 +700,107 @@
                 window.graphInitialized = true;
                 vscode.postMessage({ command: 'getGraphData' });
                 vscode.postMessage({ command: 'listSnapshots' });
+                vscode.postMessage({ command: 'getCommitTimeline' }); // Load timeline
             }
+
+            // Timeline Toggle
+            document.getElementById('toggleTimeline').onclick = () => {
+                const panel = document.getElementById('timeline-panel');
+                if (panel.style.display === 'none' || panel.style.display === '') {
+                    panel.style.display = 'flex';
+                } else {
+                    panel.style.display = 'none';
+                }
+            };
+
+            // Timeline Filter
+            let allTimelineCommits = [];
+            document.getElementById('timelineSearch').oninput = (e) => {
+                const query = e.target.value.toLowerCase();
+                const filtered = allTimelineCommits.filter(c =>
+                    c.file.toLowerCase().includes(query)
+                );
+                renderCommitList(filtered);
+            };
+
+            // Render Timeline Data
+            function renderCommitTimeline(timeline, recentCommits, totalFiles) {
+                document.getElementById('total-files').textContent = totalFiles;
+                allTimelineCommits = recentCommits; // Store for filtering
+                renderCommitList(recentCommits);
+            }
+
+            function renderCommitList(commits) {
+                const container = document.getElementById('recent-commits');
+                if (!commits || commits.length === 0) {
+                    container.innerHTML = '<div style="padding: 20px; text-align: center; opacity: 0.5;">No commits found</div>';
+                    return;
+                }
+
+                let html = '';
+                commits.forEach(commit => {
+                    const timeAgo = getTimeAgo(new Date(commit.lastModified));
+                    const authors = commit.authors.slice(0, 2).join(', ');
+                    const moreAuthors = commit.authors.length > 2 ? ` +${commit.authors.length - 2}` : '';
+
+                    html += `
+                        <div class="timeline-commit-item" 
+                             data-filepath="${escapeHtml(commit.fullPath)}" 
+                             data-commitsha="${escapeHtml(commit.commitSHA)}"
+                             style="padding: 8px; margin-bottom: 5px; border: 1px solid var(--vscode-panel-border); border-radius: 3px; cursor: pointer; transition: background 0.2s;"
+                             onmouseover="this.style.background='var(--vscode-list-hoverBackground)'" 
+                             onmouseout="this.style.background=''"
+                             onclick="highlightFileInGraph('${escapeHtml(commit.fullPath)}', '${escapeHtml(commit.commitSHA)}')">
+                            <div style="font-weight: bold; font-size: 0.9em;">${escapeHtml(commit.file)}</div>
+                            <div style="font-size: 0.8em; opacity: 0.7; margin-top: 2px;">
+                                <span style="color: #61dafb;">${commit.commits} commit${commit.commits > 1 ? 's' : ''}</span> • 
+                                ${timeAgo}
+                            </div>
+                            <div style="font-size: 0.75em; opacity: 0.6; margin-top: 2px;">👤 ${authors}${moreAuthors}</div>
+                        </div>
+                    `;
+                });
+                container.innerHTML = html;
+            }
+
+            // Helper: Time Ago
+            function getTimeAgo(date) {
+                const now = new Date();
+                const diffMs = now - date;
+                const diffMins = Math.floor(diffMs / 60000);
+                const diffHours = Math.floor(diffMs / 3600000);
+                const diffDays = Math.floor(diffMs / 86400000);
+
+                if (diffMins < 60) return `${diffMins}m ago`;
+                if (diffHours < 24) return `${diffHours}h ago`;
+                if (diffDays < 30) return `${diffDays}d ago`;
+                return date.toLocaleDateString();
+            }
+
+            // Highlight File in Graph (when clicking timeline item)
+            window.highlightFileInGraph = function (filepath, commitSHA) {
+                // Find node in graph by filepath
+                const nodes = window.currentGraphData?.nodes || [];
+                const node = nodes.find(n => n.filePath === filepath || n.filePath.endsWith(filepath));
+
+                if (node) {
+                    // Highlight the node
+                    d3.selectAll('.node').classed('highlighted', d => d.id === node.id);
+                    d3.selectAll('.node').classed('dimmed', d => d.id !== node.id);
+                }
+
+                // Show git diff if commit SHA is available
+                if (commitSHA) {
+                    vscode.postMessage({
+                        command: 'showFileDiff',
+                        filePath: filepath,
+                        commitSHA: commitSHA
+                    });
+                } else {
+                    // Just open the file if no commit SHA
+                    vscode.postMessage({ command: 'openFile', file: filepath });
+                }
+            };
 
             // Global Event Listeners for Graph Controls
             document.getElementById('resetZoom').onclick = () => {
